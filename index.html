@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ম্যাথ সাউন্ড কোডেক | সংখ্যা ↔ শব্দ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>🔊 গণিতকে সাউন্ড দিয়ে ডিকোড করুন</h1>
+        <p>সংখ্যা লিখুন → সাউন্ড ফাইল ডাউনলোড করুন | আবার সাউন্ড আপলোড করে সংখ্যা ফিরিয়ে আনুন</p>
+
+        <div class="card">
+            <h2>🎛️ এনকোড (সংখ্যা → শব্দ)</h2>
+            <input type="text" id="numbersInput" placeholder="যেমন 314159" pattern="[0-9]*" autocomplete="off">
+            <button id="encodeBtn">সাউন্ড তৈরি করুন</button>
+            <div id="encodeResult"></div>
+        </div>
+
+        <div class="card">
+            <h2>🎙️ ডিকোড (শব্দ → সংখ্যা)</h2>
+            <input type="file" id="audioFile" accept=".wav">
+            <button id="decodeBtn">সংখ্যা বের করুন</button>
+            <div id="decodeResult"></div>
+        </div>
+    </div>
+
+    <script>
+        const encodeBtn = document.getElementById('encodeBtn');
+        const decodeBtn = document.getElementById('decodeBtn');
+        const numbersInput = document.getElementById('numbersInput');
+        const audioFile = document.getElementById('audioFile');
+        const encodeResult = document.getElementById('encodeResult');
+        const decodeResult = document.getElementById('decodeResult');
+
+        encodeBtn.addEventListener('click', async () => {
+            const numbers = numbersInput.value.trim();
+            if (!/^\d+$/.test(numbers)) {
+                encodeResult.innerHTML = '<span class="error">❌ শুধু 0-9 সংখ্যা দিন</span>';
+                return;
+            }
+            encodeResult.innerHTML = '<span>🔄 এনকোডিং হচ্ছে...</span>';
+            try {
+                const response = await fetch('/encode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numbers: numbers })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'এনকোড ব্যর্থ');
+                }
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${numbers}.wav`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                encodeResult.innerHTML = '<span class="success">✅ সাউন্ড তৈরি হয়েছে, ডাউনলোড শুরু</span>';
+            } catch (err) {
+                encodeResult.innerHTML = `<span class="error">❌ ${err.message}</span>`;
+            }
+        });
+
+        decodeBtn.addEventListener('click', async () => {
+            if (!audioFile.files.length) {
+                decodeResult.innerHTML = '<span class="error">❌ একটি .wav ফাইল নির্বাচন করুন</span>';
+                return;
+            }
+            const file = audioFile.files[0];
+            if (!file.name.endsWith('.wav')) {
+                decodeResult.innerHTML = '<span class="error">❌ শুধু .wav ফাইল সমর্থিত</span>';
+                return;
+            }
+            decodeResult.innerHTML = '<span>🔄 ডিকোডিং হচ্ছে...</span>';
+            const formData = new FormData();
+            formData.append('audiofile', file);
+            try {
+                const response = await fetch('/decode', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    decodeResult.innerHTML = `<span class="success">🔢 ডিকোড করা সংখ্যা: <strong>${data.decoded}</strong></span>`;
+                } else {
+                    decodeResult.innerHTML = `<span class="error">❌ ${data.error}</span>`;
+                }
+            } catch (err) {
+                decodeResult.innerHTML = `<span class="error">❌ নেটওয়ার্ক সমস্যা</span>`;
+            }
+        });
+    </script>
+</body>
+</html>
